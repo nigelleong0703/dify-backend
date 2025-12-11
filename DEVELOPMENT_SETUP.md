@@ -14,7 +14,7 @@ cp middleware.env.example middleware.env
 echo "BILLING_ENABLED=false" >> middleware.env
 
 # Start only essential services (6 containers)
-docker compose -f docker-compose.middleware.yaml --profile postgresql --profile weaviate -p dify up -d
+docker compose -f docker-compose.middleware.yaml -p dify up -d
 ```
 
 **This starts only the essential middleware:**
