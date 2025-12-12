@@ -183,8 +183,15 @@ class FeatureService:
 
         if dify_config.ENTERPRISE_ENABLED:
             features.webapp_copyright_enabled = True
-            features.knowledge_pipeline.publish_enabled = True
             cls._fulfill_params_from_workspace_info(features, tenant_id)
+
+        # When billing is disabled, treat features as fully unlocked locally.
+        if not dify_config.BILLING_ENABLED:
+            features.billing.subscription.plan = CloudPlan.PROFESSIONAL
+            features.webapp_copyright_enabled = True
+            features.knowledge_pipeline.publish_enabled = True
+            features.is_allow_transfer_workspace = True
+            features.can_replace_logo = True
 
         return features
 
