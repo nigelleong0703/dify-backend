@@ -95,8 +95,8 @@ class QueueDispatcherManager:
                 # If billing service fails, default to sandbox
                 plan = "sandbox"
         else:
-            # If billing is disabled, default to professional to keep highest priority locally
-            plan = "professional"
+            # If billing is disabled, use team tier as default
+            plan = "team"
 
         dispatcher_class = cls.PLAN_DISPATCHER_MAP.get(
             plan,

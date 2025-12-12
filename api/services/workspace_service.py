@@ -31,12 +31,6 @@ class WorkspaceService:
         assert tenant_account_join is not None, "TenantAccountJoin not found"
         tenant_info["role"] = tenant_account_join.role
 
-        # If billing is disabled and plan looks default/basic, present as professional for local full-access
-        from configs import dify_config as _dify_config
-
-        if not _dify_config.BILLING_ENABLED and tenant_info["plan"] in {"basic", "sandbox", "", None}:
-            tenant_info["plan"] = "professional"
-
         can_replace_logo = FeatureService.get_features(tenant.id).can_replace_logo
 
         if can_replace_logo and TenantService.has_roles(tenant, [TenantAccountRole.OWNER, TenantAccountRole.ADMIN]):
