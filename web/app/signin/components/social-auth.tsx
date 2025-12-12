@@ -15,8 +15,8 @@ export default function SocialAuth(props: SocialAuthProps) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
   const [availableProviders, setAvailableProviders] = useState<{ github: boolean; google: boolean }>({
-    github: false,
-    google: false,
+    github: true,
+    google: true,
   })
   const [checkedProviders, setCheckedProviders] = useState(false)
 
@@ -38,12 +38,14 @@ export default function SocialAuth(props: SocialAuthProps) {
           redirect: 'manual',
           credentials: 'include',
         })
-        // backend returns 302 when provider is configured; 400 when not
-        return response.status >= 300 && response.status < 400
+        // opaqueredirect occurs on cross-origin 302; treat as available
+        const isRedirect = (response.status >= 300 && response.status < 400) || response.type === 'opaqueredirect'
+        // backend returns 400 when not configured
+        return isRedirect
       }
       catch (e) {
         console.error(`Failed to check ${provider} OAuth availability`, e)
-        return false
+        return true // default to showing the button on error
       }
     }
 
