@@ -50,7 +50,11 @@ from services.errors.account import (
     RoleAlreadyAssignedError,
     TenantNotFoundError,
 )
-from services.errors.workspace import WorkSpaceNotAllowedCreateError, WorkSpaceNotFoundError, WorkspacesLimitExceededError
+from services.errors.workspace import (
+    WorkSpaceNotAllowedCreateError,
+    WorkSpaceNotFoundError,
+    WorkspacesLimitExceededError,
+)
 from services.feature_service import FeatureService
 from tasks.delete_account_task import delete_account_task
 from tasks.mail_account_deletion_task import send_account_deletion_verification_code
