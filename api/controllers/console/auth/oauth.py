@@ -145,7 +145,7 @@ class OAuthCallback(Resource):
             db.session.commit()
 
         try:
-            TenantService.create_owner_tenant_if_not_exist(account)
+            TenantService.create_owner_tenant_if_not_exist(account, allow_default_tenant=True)
         except Unauthorized:
             return redirect(f"{dify_config.CONSOLE_WEB_URL}/signin?message=Workspace not found.")
         except WorkSpaceNotAllowedCreateError:
@@ -182,15 +182,11 @@ def _generate_account(provider: str, user_info: OAuthUserInfo):
     account = _get_account_by_openid_or_email(provider, user_info)
 
     if account:
+        if not AccountService.is_email_allowed_for_registration(account.email):
+            raise AccountRegisterError(description="This email is not allowed to sign in.")
         tenants = TenantService.get_join_tenants(account)
         if not tenants:
-            if not FeatureService.get_system_features().is_allow_create_workspace:
-                raise WorkSpaceNotAllowedCreateError()
-            else:
-                new_tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
-                TenantService.create_tenant_member(new_tenant, account, role="owner")
-                account.current_tenant = new_tenant
-                tenant_was_created.send(new_tenant)
+            logger.info("Account %s has no workspace membership; will attach after OAuth flow.", account.id)
 
     if not account:
         if not FeatureService.get_system_features().is_allow_register:

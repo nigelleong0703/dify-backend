@@ -50,7 +50,7 @@ from services.errors.account import (
     RoleAlreadyAssignedError,
     TenantNotFoundError,
 )
-from services.errors.workspace import WorkSpaceNotAllowedCreateError, WorkspacesLimitExceededError
+from services.errors.workspace import WorkSpaceNotAllowedCreateError, WorkSpaceNotFoundError, WorkspacesLimitExceededError
 from services.feature_service import FeatureService
 from tasks.delete_account_task import delete_account_task
 from tasks.mail_account_deletion_task import send_account_deletion_verification_code
@@ -122,6 +122,29 @@ class AccountService:
     def _delete_refresh_token(refresh_token: str, account_id: str):
         redis_client.delete(AccountService._get_refresh_token_key(refresh_token))
         redis_client.delete(AccountService._get_account_refresh_token_key(account_id))
+
+    @staticmethod
+    def is_email_allowed_for_registration(email: str) -> bool:
+        """
+        Allow registration when allowlists are empty, or when the email matches the configured
+        domain/email allowlists.
+        """
+        email_lower = email.strip().lower()
+        allowed_domains = dify_config.AUTH_ALLOWED_DOMAINS_LIST
+        allowed_emails = dify_config.AUTH_ALLOWED_EMAILS_LIST
+
+        if not allowed_domains and not allowed_emails:
+            return True
+
+        if email_lower in allowed_emails:
+            return True
+
+        if "@" in email_lower:
+            domain = email_lower.split("@")[-1]
+            if domain in allowed_domains:
+                return True
+
+        return False
 
     @staticmethod
     def load_user(user_id: str) -> None | Account:
@@ -283,11 +306,13 @@ class AccountService:
         email: str, name: str, interface_language: str, password: str | None = None
     ) -> Account:
         """create account"""
+        if not AccountService.is_email_allowed_for_registration(email):
+            raise AccountRegisterError("This email is not allowed to register.")
         account = AccountService.create_account(
             email=email, name=name, interface_language=interface_language, password=password
         )
 
-        TenantService.create_owner_tenant_if_not_exist(account=account)
+        TenantService.create_owner_tenant_if_not_exist(account=account, allow_default_tenant=True)
 
         return account
 
@@ -1002,7 +1027,9 @@ class TenantService:
         return tenant
 
     @staticmethod
-    def create_owner_tenant_if_not_exist(account: Account, name: str | None = None, is_setup: bool | None = False):
+    def create_owner_tenant_if_not_exist(
+        account: Account, name: str | None = None, is_setup: bool | None = False, allow_default_tenant: bool = False
+    ):
         """Check if user have a workspace or not"""
         available_ta = (
             db.session.query(TenantAccountJoin)
@@ -1016,6 +1043,14 @@ class TenantService:
 
         """Create owner tenant if not exist"""
         if not FeatureService.get_system_features().is_allow_create_workspace and not is_setup:
+            if allow_default_tenant:
+                try:
+                    tenant = TenantService.get_default_tenant()
+                except WorkSpaceNotFoundError as exc:
+                    raise WorkSpaceNotAllowedCreateError() from exc
+                TenantService.create_tenant_member(tenant, account, role=TenantAccountRole.NORMAL)
+                TenantService.switch_tenant(account, tenant.id)
+                return
             raise WorkSpaceNotAllowedCreateError()
 
         workspaces = FeatureService.get_system_features().license.workspaces
@@ -1173,6 +1208,19 @@ class TenantService:
         return cast(int, db.session.query(func.count(Tenant.id)).scalar())
 
     @staticmethod
+    def get_default_tenant() -> Tenant:
+        """Return the oldest active tenant to use as the default workspace."""
+        tenant = (
+            db.session.query(Tenant)
+            .filter(Tenant.status == TenantStatus.NORMAL)
+            .order_by(Tenant.created_at.asc())
+            .first()
+        )
+        if not tenant:
+            raise WorkSpaceNotFoundError("No available workspace found.")
+        return tenant
+
+    @staticmethod
     def check_member_permission(tenant: Tenant, operator: Account, member: Account | None, action: str):
         """Check member permission"""
         perms = {
@@ -1312,6 +1360,8 @@ class RegisterService:
         db.session.begin_nested()
         """Register account"""
         try:
+            if not is_setup and not AccountService.is_email_allowed_for_registration(email):
+                raise AccountRegisterError("This email is not allowed to register.")
             account = AccountService.create_account(
                 email=email,
                 name=name,
@@ -1325,15 +1375,10 @@ class RegisterService:
             if open_id is not None and provider is not None:
                 AccountService.link_account_integrate(provider, open_id, account)
 
-            if (
-                FeatureService.get_system_features().is_allow_create_workspace
-                and create_workspace_required
-                and FeatureService.get_system_features().license.workspaces.is_available()
-            ):
-                tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
-                TenantService.create_tenant_member(tenant, account, role="owner")
-                account.current_tenant = tenant
-                tenant_was_created.send(tenant)
+            if create_workspace_required:
+                TenantService.create_owner_tenant_if_not_exist(
+                    account=account, allow_default_tenant=True, name=f"{account.name}'s Workspace"
+                )
 
             db.session.commit()
         except WorkSpaceNotAllowedCreateError:
@@ -1367,7 +1412,12 @@ class RegisterService:
             name = email.split("@")[0]
 
             account = cls.register(
-                email=email, name=name, language=language, status=AccountStatus.PENDING, is_setup=True
+                email=email,
+                name=name,
+                language=language,
+                status=AccountStatus.PENDING,
+                is_setup=True,
+                create_workspace_required=False,
             )
             # Create new tenant member for invited tenant
             TenantService.create_tenant_member(tenant, account, role)

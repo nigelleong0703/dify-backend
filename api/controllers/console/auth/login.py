@@ -109,6 +109,9 @@ class LoginApi(Resource):
         except services.errors.account.AccountPasswordError:
             AccountService.add_login_error_rate_limit(args.email)
             raise AuthenticationFailedError()
+
+        if not AccountService.is_email_allowed_for_registration(account.email):
+            raise InvalidEmailError()
         # SELF_HOSTED only have one workspace
         tenants = TenantService.get_join_tenants(account)
         if len(tenants) == 0:
@@ -194,6 +197,9 @@ class EmailCodeLoginSendEmailApi(Resource):
         if AccountService.is_email_send_ip_limit(ip_address):
             raise EmailSendIpLimitError()
 
+        if not AccountService.is_email_allowed_for_registration(args.email):
+            raise InvalidEmailError()
+
         if args.language is not None and args.language == "zh-Hans":
             language = "zh-Hans"
         else:
@@ -224,6 +230,9 @@ class EmailCodeLoginApi(Resource):
         user_email = args.email
         language = args.language
 
+        if not AccountService.is_email_allowed_for_registration(user_email):
+            raise InvalidEmailError()
+
         token_data = AccountService.get_email_code_login_data(args.token)
         if token_data is None:
             raise InvalidTokenError()
@@ -240,18 +249,12 @@ class EmailCodeLoginApi(Resource):
         except AccountRegisterError:
             raise AccountInFreezeError()
         if account:
-            tenants = TenantService.get_join_tenants(account)
-            if not tenants:
-                workspaces = FeatureService.get_system_features().license.workspaces
-                if not workspaces.is_available():
-                    raise WorkspacesLimitExceeded()
-                if not FeatureService.get_system_features().is_allow_create_workspace:
-                    raise NotAllowedCreateWorkspace()
-                else:
-                    new_tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
-                    TenantService.create_tenant_member(new_tenant, account, role="owner")
-                    account.current_tenant = new_tenant
-                    tenant_was_created.send(new_tenant)
+            try:
+                TenantService.create_owner_tenant_if_not_exist(account, allow_default_tenant=True)
+            except WorkspacesLimitExceededError:
+                raise WorkspacesLimitExceeded()
+            except WorkSpaceNotAllowedCreateError:
+                raise NotAllowedCreateWorkspace()
 
         if account is None:
             try:
