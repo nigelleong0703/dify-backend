@@ -73,6 +73,9 @@ class EmailRegisterSendEmailApi(Resource):
         if dify_config.BILLING_ENABLED and BillingService.is_email_in_freeze(args.email):
             raise AccountInFreezeError()
 
+        if not AccountService.is_email_allowed_for_registration(args.email):
+            raise InvalidEmailError()
+
         with Session(db.engine) as session:
             account = session.execute(select(Account).filter_by(email=args.email)).scalar_one_or_none()
         token = None

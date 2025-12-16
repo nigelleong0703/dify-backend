@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'next/navigation'
 import style from '../page.module.css'
@@ -13,6 +14,11 @@ type SocialAuthProps = {
 export default function SocialAuth(props: SocialAuthProps) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
+  const [availableProviders, setAvailableProviders] = useState<{ github: boolean; google: boolean }>({
+    github: true,
+    google: true,
+  })
+  const [checkedProviders, setCheckedProviders] = useState(false)
 
   const getOAuthLink = (href: string) => {
     const url = getPurifyHref(`${API_PREFIX}${href}`)
@@ -21,8 +27,51 @@ export default function SocialAuth(props: SocialAuthProps) {
 
     return url
   }
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const checkProvider = async (provider: 'github' | 'google') => {
+      try {
+        const response = await fetch(getOAuthLink(`/oauth/login/${provider}`), {
+          method: 'GET',
+          redirect: 'manual',
+          credentials: 'include',
+        })
+        // opaqueredirect occurs on cross-origin 302; treat as available
+        const isRedirect = (response.status >= 300 && response.status < 400) || response.type === 'opaqueredirect'
+        // backend returns 400 when not configured
+        return isRedirect
+      }
+      catch (e) {
+        console.error(`Failed to check ${provider} OAuth availability`, e)
+        return true // default to showing the button on error
+      }
+    }
+
+    const run = async () => {
+      const [githubAvailable, googleAvailable] = await Promise.all([
+        checkProvider('github'),
+        checkProvider('google'),
+      ])
+      if (!isCancelled) {
+        setAvailableProviders({ github: githubAvailable, google: googleAvailable })
+        setCheckedProviders(true)
+      }
+    }
+
+    void run()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [])
+
+  if (checkedProviders && !availableProviders.github && !availableProviders.google)
+    return null
+
   return <>
-    <div className='w-full'>
+    {availableProviders.github && <div className='w-full'>
       <a href={getOAuthLink('/oauth/login/github')}>
         <Button
           disabled={props.disabled}
@@ -39,8 +88,8 @@ export default function SocialAuth(props: SocialAuthProps) {
           </>
         </Button>
       </a>
-    </div>
-    <div className='w-full'>
+    </div>}
+    {availableProviders.google && <div className='w-full'>
       <a href={getOAuthLink('/oauth/login/google')}>
         <Button
           disabled={props.disabled}
@@ -57,6 +106,6 @@ export default function SocialAuth(props: SocialAuthProps) {
           </>
         </Button>
       </a>
-    </div>
+    </div>}
   </>
 }

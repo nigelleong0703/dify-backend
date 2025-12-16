@@ -186,6 +186,10 @@ class FeatureService:
             features.knowledge_pipeline.publish_enabled = True
             cls._fulfill_params_from_workspace_info(features, tenant_id)
 
+        # Force local full access: always present as professional and allow pipeline publish.
+        features.billing.subscription.plan = CloudPlan.PROFESSIONAL
+        features.knowledge_pipeline.publish_enabled = True
+
         return features
 
     @classmethod

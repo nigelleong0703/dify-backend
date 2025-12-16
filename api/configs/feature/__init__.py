@@ -1198,6 +1198,22 @@ class LoginConfig(BaseSettings):
         description="whether to enable create workspace",
         default=False,
     )
+    AUTH_ALLOWED_DOMAINS: str = Field(
+        description="Comma-separated list of allowed email domains for self registration and OAuth",
+        default="",
+    )
+    AUTH_ALLOWED_EMAILS: str = Field(
+        description="Comma-separated list of allowed email addresses (overrides domains) for registration/OAuth",
+        default="",
+    )
+
+    @property
+    def AUTH_ALLOWED_DOMAINS_LIST(self) -> list[str]:
+        return [item.strip().lower() for item in self.AUTH_ALLOWED_DOMAINS.split(",") if item.strip() != ""]
+
+    @property
+    def AUTH_ALLOWED_EMAILS_LIST(self) -> list[str]:
+        return [item.strip().lower() for item in self.AUTH_ALLOWED_EMAILS.split(",") if item.strip() != ""]
 
 
 class AccountConfig(BaseSettings):
