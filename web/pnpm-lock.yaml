@@ -215,8 +215,8 @@ importers:
         specifier: ^1.2.1
         version: 1.2.1
       lexical:
-        specifier: ^0.38.2
-        version: 0.38.2
+        specifier: ^0.39.0
+        version: 0.39.0
       line-clamp:
         specifier: ^1.0.0
         version: 1.0.0
@@ -6427,6 +6427,9 @@ packages:
 
   lexical@0.38.2:
     resolution: {integrity: sha512-JJmfsG3c4gwBHzUGffbV7ifMNkKAWMCnYE3xJl87gty7hjyV5f3xq7eqTjP5HFYvO4XpjJvvWO2/djHp5S10tw==}
+
+  lexical@0.39.0:
+    resolution: {integrity: sha512-lpLv7MEJH5QDujEDlYqettL3ATVtNYjqyimzqgrm0RvCm3AO9WXSdsgTxuN7IAZRu88xkxCDeYubeUf4mNZVdg==}
 
   lib0@0.2.114:
     resolution: {integrity: sha512-gcxmNFzA4hv8UYi8j43uPlQ7CGcyMJ2KQb5kZASw6SnAKAf10hK12i2fjrS3Cl/ugZa5Ui6WwIu1/6MIXiHttQ==}
@@ -15778,6 +15781,8 @@ snapshots:
       type-check: 0.4.0
 
   lexical@0.38.2: {}
+
+  lexical@0.39.0: {}
 
   lib0@0.2.114:
     dependencies:
